@@ -5,6 +5,7 @@ dotenv.config();
 
 const client = createClient(process.env.PEXELS_KEY);
 const sndkey = process.env.FREESOUND_KEY
+const clientid = process.env.FREESOUND_CLIENT_ID
 const query = 'Nature';
 
 (async () => {
@@ -17,4 +18,5 @@ const query = 'Nature';
     console.log(sndid);
     const sndget = await axios.get(`https://freesound.org/apiv2/sounds/${sndid}/?token=${sndkey}`);
     console.log(sndget.data);
+    console.log('To download access ', `https://freesound.org/apiv2/oauth2/authorize/?client_id=${clientid}&response_type=code&state=xyz`)
 })();
