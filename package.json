@@ -1,0 +1,25 @@
+{
+  "name": "video_ad_maker",
+  "version": "1.0.0",
+  "description": "Low-cost self-hosted fliki.ai clone",
+  "homepage": "https://github.com/voscarmv/video_ad_maker#readme",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/voscarmv/video_ad_maker/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/voscarmv/video_ad_maker.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
+    "pexels": "^1.4.0"
+  }
+}
