@@ -1,5 +1,5 @@
 #!/bin/bash
 
-node scriptgen.js | tee poem.txt
+node scriptgen2.js | tee poem.txt
 cat poem.txt | ./creepy.sh
 ./makevid.sh

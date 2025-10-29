@@ -7,7 +7,7 @@ const openai = new OpenAI({
 
 async function main() {
   const completion = await openai.chat.completions.create({
-    messages: [{ role: "system", content: "Write some surrealist prose." }],
+    messages: [{ role: "system", content: "Write a surrealist prose." }],
     model: "gpt-4o",
     temperature: 1.222,
     response_format: {

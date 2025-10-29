@@ -4,6 +4,7 @@ CTR=0
 TOT=0
 PREV='00:00:00,000'
 SOX='sox '
+RM='rm '
 >result.srt
 while read line ; do
     FNAME1="out${CTR}A.wav"
@@ -28,12 +29,14 @@ while read line ; do
 
     echo $((CTR+1)) >> result.srt
     echo "$PREV --> $NEXT" >> result.srt
-    echo $line >> result.srt
+    echo "$line" >> result.srt
     echo >> result.srt
 
     PREV=$NEXT
     SOX="$SOX $FNAME5 "
+    RM="$RM $FNAME1 $FNAME2 $FNAME3 $FNAME4 $FNAME5 "
     CTR=$((CTR+1))
 done
 
 eval "$SOX result.wav"
+eval "$RM"
