@@ -1,0 +1,1 @@
+ffmpeg -f lavfi -i color=c=black:s=1920x1080 -i result.wav -vf "subtitles=result.srt:force_style='Alignment=10,MarginV=540'" -c:v libx264 -c:a aac -shortest output.mp4
