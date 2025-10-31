@@ -1,11 +1,10 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import { createClient } from 'pexels';
-import axios from 'axios';
 
 const client = createClient(process.env.PEXELS_KEY);
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY,
+    apiKey: process.env.OPENAI_KEY,
 });
 
 const messages = [];
@@ -21,7 +20,7 @@ const tools = [
                 properties: {
                     query: {
                         type: 'string',
-                        description: 'Search query',
+                        description: 'For example your query could be something broad like Nature, Tigers, People. Or it could be something specific like Group of people working.',
                     }
                 },
                 required: ['query']
@@ -31,14 +30,14 @@ const tools = [
 ];
 
 const functions = {
-    searchVids: (params) => {
+    searchVids: async (params) => {
         const { query } = params;
-        const vids = query;
-        return [vids];
+        const vidsearch = await client.videos.search({ query, per_page: 1 });
+        return vidsearch;
     },
 };
 
 messages.push({
-    role: 'developer',
+    role: 'system',
     content: ''
 })
