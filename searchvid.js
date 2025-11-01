@@ -44,52 +44,100 @@ messages.push({
     content: 'You process images'
 });
 
-(async () => {
-    const vids = await functions['searchVids']({ query: 'relaxing nature' });
-    console.log(vids.videos[2].image);
-    const response = await axios.get(vids.videos[2].image, {
-        responseType: 'arraybuffer',  // Get response as buffer
-    });
-    const buffer = Buffer.from(response.data);
+async function msgContent(videos) {
+    const content = [];
     const options = {
         maxWidth: 512,
         maxHeight: 512,
         quality: 80,
         format: 'jpeg'
     };
-    const compressed = await sharp(buffer)
-        .resize(options.maxWidth, options.maxHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
+    for (let i = 0; i < videos.length && i < 5; i++) {
+        const response = await axios.get(videos[i].image, {
+            responseType: 'arraybuffer',  // Get response as buffer
+        });
+        const buffer = Buffer.from(response.data);
+        const compressed = await sharp(buffer)
+            .resize(options.maxWidth, options.maxHeight, {
+                fit: 'inside',
+                withoutEnlargement: true
+            })
+            .toFormat(options.format, {
+                quality: options.quality,
+                mozjpeg: true
+            })
+            .toBuffer();
+        const base64 = compressed.toString('base64');
+        const dataUri = `data:image/${options.format};base64,${base64}`;
+        content.push({
+            type: 'image_url',
+            image_url: {
+                url: dataUri,
+                detail: 'low'
+            }
         })
-        .toFormat(options.format, {
-            quality: options.quality,
-            mozjpeg: true
-        })
-        .toBuffer();
-    const base64 = compressed.toString('base64');
-    const dataUri = `data:image/${options.format};base64,${base64}`;
+    }
+    return content;
+}
+
+(async () => {
+    const vids = await functions['searchVids']({ query: 'relaxing nature' });
+    // console.log(vids.videos[2].image);
+    // const response = await axios.get(vids.videos[2].image, {
+    //     responseType: 'arraybuffer',  // Get response as buffer
+    // });
+    // const buffer = Buffer.from(response.data);
+    // const options = {
+    //     maxWidth: 512,
+    //     maxHeight: 512,
+    //     quality: 80,
+    //     format: 'jpeg'
+    // };
+    // const compressed = await sharp(buffer)
+    //     .resize(options.maxWidth, options.maxHeight, {
+    //         fit: 'inside',
+    //         withoutEnlargement: true
+    //     })
+    //     .toFormat(options.format, {
+    //         quality: options.quality,
+    //         mozjpeg: true
+    //     })
+    //     .toBuffer();
+    // const base64 = compressed.toString('base64');
+    // const dataUri = `data:image/${options.format};base64,${base64}`;
+    const content = await msgContent(vids);
+    content.unshift({
+        type: 'text',
+        text: 'Describe these images'
+    })
     messages.push(
         {
             role: 'user',
-            content: [
-                {
-                    type: 'text',
-                    text: 'Describe this image'
-                },
-                {
-                    type: 'image_url',
-                    image_url: {
-                        url: dataUri,
-                        detail: 'low'
-                    }
-                }
-            ]
+            content
         }
     );
     const completion = await openai.chat.completions.create({
         messages,
         model: "gpt-4o",
+        response_format: {
+            type: 'json_schema',
+            json_schema: {
+                name: 'image_descriptions',
+                schema: {
+                    type: "object",
+                    properties: {
+                        descriptions: {
+                            type: "array",
+                            description: "Ordered array of descriptions of the images",
+                            items: {
+                                description: "The description of an image",
+                                type: "string"
+                            }
+                        }
+                    }
+                }
+            }
+        }
     });
     console.log(completion.choices[0].message.content);
 })();
