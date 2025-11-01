@@ -47,12 +47,14 @@ messages.push({
 async function msgContent(videos) {
     const content = [];
     const options = {
-        maxWidth: 512,
-        maxHeight: 512,
+        maxWidth: 1024,
+        maxHeight: 1024,
         quality: 80,
         format: 'jpeg'
     };
+    console.log(videos);
     for (let i = 0; i < videos.length && i < 5; i++) {
+        console.log(videos[i]);
         const response = await axios.get(videos[i].image, {
             responseType: 'arraybuffer',  // Get response as buffer
         });
@@ -73,7 +75,7 @@ async function msgContent(videos) {
             type: 'image_url',
             image_url: {
                 url: dataUri,
-                detail: 'low'
+                detail: 'high'
             }
         })
     }
@@ -116,28 +118,29 @@ async function msgContent(videos) {
             content
         }
     );
+    console.log(messages[1].content);
     const completion = await openai.chat.completions.create({
         messages,
         model: "gpt-4o",
-        response_format: {
-            type: 'json_schema',
-            json_schema: {
-                name: 'image_descriptions',
-                schema: {
-                    type: "object",
-                    properties: {
-                        descriptions: {
-                            type: "array",
-                            description: "Ordered array of descriptions of the images",
-                            items: {
-                                description: "The description of an image",
-                                type: "string"
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        // response_format: {
+        //     type: 'json_schema',
+        //     json_schema: {
+        //         name: 'image_descriptions',
+        //         schema: {
+        //             type: "object",
+        //             properties: {
+        //                 descriptions: {
+        //                     type: "array",
+        //                     description: "Ordered array of descriptions of the images",
+        //                     items: {
+        //                         description: "The description of an image",
+        //                         type: "string"
+        //                     }
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
     });
     console.log(completion.choices[0].message.content);
 })();
