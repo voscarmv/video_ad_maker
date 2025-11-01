@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
 import { createClient } from 'pexels';
+import axios from 'axios';
+import sharp from 'sharp';
 
 const client = createClient(process.env.PEXELS_KEY);
 const openai = new OpenAI({
@@ -39,7 +41,7 @@ const functions = {
 
 messages.push({
     role: 'system',
-    content: ''
+    content: 'You process images'
 });
 
 (async () => {
@@ -66,6 +68,7 @@ messages.push({
         })
         .toBuffer();
     const base64 = compressed.toString('base64');
+    const dataUri = `data:image/${options.format};base64,${base64}`;
     messages.push(
         {
             role: 'user',
@@ -77,13 +80,18 @@ messages.push({
                 {
                     type: 'image_url',
                     image_url: {
-                        url: base64,
+                        url: dataUri,
                         detail: 'low'
                     }
                 }
             ]
         }
-    )
+    );
+    const completion = await openai.chat.completions.create({
+        messages,
+        model: "gpt-4o",
+    });
+    console.log(completion.choices[0].message.content);
 })();
 
 
