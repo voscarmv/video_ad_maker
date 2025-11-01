@@ -32,7 +32,7 @@ const tools = [
 const functions = {
     searchVids: async (params) => {
         const { query } = params;
-        const vidsearch = await client.videos.search({ query, per_page: 1 });
+        const vidsearch = await client.videos.search({ query, per_page: 5 });
         return vidsearch;
     },
 };
@@ -40,4 +40,50 @@ const functions = {
 messages.push({
     role: 'system',
     content: ''
-})
+});
+
+(async () => {
+    const vids = await functions['searchVids']({ query: 'relaxing nature' });
+    console.log(vids.videos[2].image);
+    const response = await axios.get(vids.videos[2].image, {
+        responseType: 'arraybuffer',  // Get response as buffer
+    });
+    const buffer = Buffer.from(response.data);
+    const options = {
+        maxWidth: 512,
+        maxHeight: 512,
+        quality: 80,
+        format: 'jpeg'
+    };
+    const compressed = await sharp(buffer)
+        .resize(options.maxWidth, options.maxHeight, {
+            fit: 'inside',
+            withoutEnlargement: true
+        })
+        .toFormat(options.format, {
+            quality: options.quality,
+            mozjpeg: true
+        })
+        .toBuffer();
+    const base64 = compressed.toString('base64');
+    messages.push(
+        {
+            role: 'user',
+            content: [
+                {
+                    type: 'text',
+                    text: 'Describe this image'
+                },
+                {
+                    type: 'image_url',
+                    image_url: {
+                        url: base64,
+                        detail: 'low'
+                    }
+                }
+            ]
+        }
+    )
+})();
+
+
