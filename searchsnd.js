@@ -23,7 +23,7 @@ import { readFile, writeFile } from 'node:fs/promises';
             params: {
                 query: 'relaxing',
                 filter: 'category:Music tag:jazz',
-                fields: 'id,url,download,avg_rating,name,tags,description,duration'
+                fields: 'id,url,type,download,avg_rating,name,tags,description,duration'
             },
             headers: {
                 Authorization: `Bearer ${response.data.access_token}`

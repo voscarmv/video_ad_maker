@@ -9,8 +9,6 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_KEY,
 });
 
-const messages = [];
-
 const tools = [
     {
         type: 'function',
@@ -34,64 +32,75 @@ const tools = [
 const functions = {
     searchVids: async (params) => {
         const { query } = params;
-        const vidsearch = await client.videos.search({ query, per_page: 5 });
-        return vidsearch;
+        const vids = await client.videos.search({ query, per_page: 3, orientation: 'square', size: 'small' });
+        // return vids;
+        const videos = [];
+        for (let i = 0; i < vids.videos.length; i++) {
+            const response = await axios.get(vids.videos[i].image, {
+                responseType: 'arraybuffer',  // Get response as buffer
+            });
+            const buffer = Buffer.from(response.data);
+            const options = {
+                maxWidth: 512,
+                maxHeight: 512,
+                quality: 80,
+                format: 'jpeg'
+            };
+            const compressed = await sharp(buffer)
+                .resize(options.maxWidth, options.maxHeight, {
+                    fit: 'inside',
+                    withoutEnlargement: true
+                })
+                .toFormat(options.format, {
+                    quality: options.quality,
+                    mozjpeg: true
+                })
+                .toBuffer();
+            const base64 = compressed.toString('base64');
+            const dataUri = `data:image/${options.format};base64,${base64}`;
+            const messages = [];
+            messages.push(
+                {
+                    role: 'user',
+                    content: [
+                        {
+                            type: 'text',
+                            text: 'Describe this video thumbnail'
+                        },
+                        {
+                            type: 'image_url',
+                            image_url: {
+                                url: dataUri,
+                                detail: 'low'
+                            }
+                        }
+                    ]
+                }
+            );
+            const completion = await openai.chat.completions.create({
+                messages,
+                model: "gpt-4o-mini",
+            });
+
+            videos.push({
+                link: vids.videos[i].video_files[0].link,
+                thumbnail: vids.videos[i].image,
+                description: completion.choices[0].message.content
+            });
+        }
+        return videos;
     },
 };
 
+const messages = [];
 messages.push({
     role: 'system',
-    content: 'You process images'
+    content: 'You process video thumbnails'
 });
 
 (async () => {
-    const vids = await functions['searchVids']({ query: 'relaxing nature' });
-    console.log(vids.videos[2].image);
-    const response = await axios.get(vids.videos[0].image, {
-        responseType: 'arraybuffer',  // Get response as buffer
-    });
-    const buffer = Buffer.from(response.data);
-    const options = {
-        maxWidth: 512,
-        maxHeight: 512,
-        quality: 80,
-        format: 'jpeg'
-    };
-    const compressed = await sharp(buffer)
-        .resize(options.maxWidth, options.maxHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
-        })
-        .toFormat(options.format, {
-            quality: options.quality,
-            mozjpeg: true
-        })
-        .toBuffer();
-    const base64 = compressed.toString('base64');
-    const dataUri = `data:image/${options.format};base64,${base64}`;
-    messages.push(
-        {
-            role: 'user',
-            content: [
-                {
-                    type: 'text',
-                    text: 'Describe this image'
-                },
-                {
-                    type: 'image_url',
-                    image_url: {
-                        url: dataUri,
-                        detail: 'low'
-                    }
-                }
-            ]
-        }
-    );
-    const completion = await openai.chat.completions.create({
-        messages,
-        model: "gpt-4o",
-    });
-    console.log(completion.choices[0].message.content);
+    const vids = await functions['searchVids']({ query: 'relaxing nature'});
+    console.log(vids);
 })();
 
 

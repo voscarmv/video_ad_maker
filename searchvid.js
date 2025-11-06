@@ -84,6 +84,8 @@ async function msgContent(videos) {
 
 (async () => {
     const vids = await functions['searchVids']({ query: 'relaxing nature' });
+    console.log(vids.videos[0].video_files);
+    return;
     // console.log(vids.videos[2].image);
     // const response = await axios.get(vids.videos[2].image, {
     //     responseType: 'arraybuffer',  // Get response as buffer
