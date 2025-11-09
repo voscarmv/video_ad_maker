@@ -141,6 +141,10 @@ const functions = {
             const base64 = compressed.toString('base64');
             const dataUri = `data:image/${options.format};base64,${base64}`;
             const messages = [];
+            messages.push({
+                role: 'system',
+                content: 'You process video thumbnails'
+            });
             messages.push(
                 {
                     role: 'user',
@@ -272,7 +276,7 @@ messages.push({
     })
     console.log(dlvid);
     console.log('---');
-    const music = await functions['searchMusic']({ query: 'relaxing', tags: ['jazz']});
+    const music = await functions['searchMusic']({ query: 'relaxing', tags: ['jazz'] });
     const m = JSON.parse(music);
     console.log(m);
     const dlmusic = await functions['downloadMusic']({
