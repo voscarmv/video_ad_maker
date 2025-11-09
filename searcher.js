@@ -3,7 +3,9 @@ import OpenAI from 'openai';
 import { createClient } from 'pexels';
 import axios from 'axios';
 import sharp from 'sharp';
-import fs from 'fs'; 
+import fs from 'fs';
+import { finished } from "stream/promises";
+import { readFile, writeFile } from 'node:fs/promises';
 
 const client = createClient(process.env.PEXELS_KEY);
 const openai = new OpenAI({
@@ -77,6 +79,31 @@ const tools = [
             }
         }
     },
+    {
+        type: 'function',
+        function: {
+            name: 'downloadMusic',
+            description: 'Download a music file. Returns downloaded file path and its description.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    url: {
+                        type: 'string',
+                        description: 'URL of the music',
+                    },
+                    file_type: {
+                        type: 'string',
+                        description: 'File format for the resulting filename, e.g. wav, mp3, etc...',
+                    },
+                    description: {
+                        type: 'string',
+                        description: 'Music description'
+                    }
+                },
+                required: ['url']
+            }
+        }
+    },
 ];
 
 const functions = {
@@ -139,7 +166,7 @@ const functions = {
 
             videos.push({
                 downloadlink: vids.videos[i].video_files[0].link,
-                type: vids.video[i].video_files[0].file_type,
+                type: vids.videos[i].video_files[0].file_type,
                 thumbnail: vids.videos[i].image,
                 description: completion.choices[0].message.content
             });
@@ -148,7 +175,7 @@ const functions = {
     },
     searchMusic: async (params) => {
         const { query, tags } = params;
-        const t = '';
+        let t = '';
         for (let i = 0; i < tags.length; i++) {
             t = `${t} tag:${tags[i]}`
         }
@@ -163,13 +190,13 @@ const functions = {
             "https://freesound.org/apiv2/oauth2/access_token/",
             data
         );
-        console.log(response.data);
+        // console.log(response.data);
         await writeFile('./.env.refresh', response.data.refresh_token, 'utf8');
         const searchResult = await axios.get('https://freesound.org/apiv2/search/text/',
             {
                 params: {
                     query,
-                    page_size: 5,
+                    page_size: 3,
                     filter: `category:Music ${t}`,
                     fields: 'id,url,type,download,avg_rating,name,tags,description,duration'
                 },
@@ -181,8 +208,50 @@ const functions = {
         return JSON.stringify(searchResult.data.results);
     },
     downloadVid: async (params) => {
-        const { url, type } = params;
-        // const
+        const { url, type, description } = params;
+        const filepath = `./video${Date.now()}.${type}`;
+        const response = await axios.get(url, { responseType: "stream" });
+        const writer = fs.createWriteStream(filepath);
+        response.data.pipe(writer);
+        await finished(writer);
+        return JSON.stringify(
+            {
+                filepath,
+                description
+            }
+        )
+    },
+    downloadMusic: async (params) => {
+        const { url, type, description } = params;
+        const filepath = `./music${Date.now()}.${type}`;
+        const refresh = await readFile('./.env.refresh', 'utf8');
+        const data = new URLSearchParams({
+            client_id: process.env.FREESOUND_CLIENT_ID,
+            client_secret: process.env.FREESOUND_CLIENT_SECRET,
+            grant_type: "refresh_token",
+            refresh_token: refresh,
+        });
+        const response = await axios.post(
+            "https://freesound.org/apiv2/oauth2/access_token/",
+            data
+        );
+        // console.log(response.data);
+        await writeFile('./.env.refresh', response.data.refresh_token, 'utf8');
+        const response2 = await axios.get(url, {
+            responseType: "stream",
+            headers: {
+                Authorization: `Bearer ${response.data.access_token}`,
+            },
+        });
+        const writer = fs.createWriteStream(filepath);
+        response2.data.pipe(writer);
+        await finished(writer);
+        return JSON.stringify(
+            {
+                filepath,
+                description
+            }
+        )
     }
 };
 
@@ -194,7 +263,25 @@ messages.push({
 
 (async () => {
     const vids = await functions['searchVids']({ query: 'relaxing nature' });
-    console.log(vids);
+    const v = JSON.parse(vids);
+    console.log(v);
+    const dlvid = await functions['downloadVid']({
+        url: v[0].downloadlink,
+        type: v[0].type.split('/')[1],
+        description: v[0].description
+    })
+    console.log(dlvid);
+    console.log('---');
+    const music = await functions['searchMusic']({ query: 'relaxing', tags: ['jazz']});
+    const m = JSON.parse(music);
+    console.log(m);
+    const dlmusic = await functions['downloadMusic']({
+        url: m[0].download,
+        type: m[0].type,
+        description: m[0].description
+    })
+    console.log(dlmusic);
+    console.log('---');
 })();
 
 
