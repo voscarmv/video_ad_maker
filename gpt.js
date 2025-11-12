@@ -8,7 +8,7 @@ export async function gpt(messages, tools) {
   const completion = await openai.chat.completions.create({
     messages,
     tools,
-    model: 'gpt-4.1-mini'
+    model: 'gpt-4.1-mini',
   });
   const message = completion?.choices?.[0]?.message;
   return {
@@ -42,7 +42,6 @@ export async function runAI(name, messages, tools, functions, additionalArgs = {
   if (reply.tool_calls) {
     for (let i = 0; i < reply.tool_calls.length; i++) {
       const result = await callTool(reply.tool_calls[i], additionalArgs, functions);
-      console.log(result.content);
       messages.push({
         role: 'tool',
         tool_call_id: result.tool_call_id,

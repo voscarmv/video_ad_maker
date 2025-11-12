@@ -149,14 +149,14 @@ export const searcherTools = [
                     },
                     file_type: {
                         type: 'string',
-                        description: 'File format for the resulting filename, e.g. mp4, avi, etc...',
+                        description: 'File format from the search result: mp4, avi, etcetera.',
                     },
                     description: {
                         type: 'string',
                         description: 'Video description'
                     }
                 },
-                required: ['url']
+                required: ['url', 'file_type', 'description']
             }
         }
     },
@@ -174,14 +174,14 @@ export const searcherTools = [
                     },
                     file_type: {
                         type: 'string',
-                        description: 'Three letter file format for the resulting filename, e.g. wav, mp3, etc...',
+                        description: 'File format from the search results, for example wav, mp3, etcetera.',
                     },
                     description: {
                         type: 'string',
                         description: 'Music description'
                     }
                 },
-                required: ['url']
+                required: ['url', 'file_type', 'description']
             }
         }
     },
@@ -259,10 +259,7 @@ export const searcherFunctions = {
         return JSON.stringify(videos);
     },
     searchMusic: async (params) => {
-        console.log(`params ${JSON.stringify(params)}`);
         const { query, tags } = params;
-        console.log(`tags ${tags}`);
-
         const refresh = await readFile('./.env.refresh', 'utf8');
         const data = new URLSearchParams({
             client_id: process.env.FREESOUND_CLIENT_ID,
@@ -292,8 +289,8 @@ export const searcherFunctions = {
         return JSON.stringify(searchResult.data.results);
     },
     downloadVid: async (params) => {
-        const { url, type, description } = params;
-        const filepath = `./video${Date.now()}.${type}`;
+        const { url, file_type, description } = params;
+        const filepath = `./video${Date.now()}.${file_type}`;
         const response = await axios.get(url, { responseType: "stream" });
         const writer = fs.createWriteStream(filepath);
         response.data.pipe(writer);
@@ -306,8 +303,8 @@ export const searcherFunctions = {
         )
     },
     downloadMusic: async (params) => {
-        const { url, type, description } = params;
-        const filepath = `./music${Date.now()}.${type}`;
+        const { url, file_type, description } = params;
+        const filepath = `./music${Date.now()}.${file_type}`;
         const refresh = await readFile('./.env.refresh', 'utf8');
         const data = new URLSearchParams({
             client_id: process.env.FREESOUND_CLIENT_ID,
