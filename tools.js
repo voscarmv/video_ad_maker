@@ -23,7 +23,7 @@ Evaluate search results before downloading, and if necessary run multiple differ
 These are the members of the team (agents)
 
 Director: Directs the whole operation. Communicates with team members to reach the goal. Terminates the process when all is done.
-Searcher: Can search and download videos and music files. Searcher can perform several consecutive searches, but musta always get back to the director once something worth showing is found. Searcher can also download multiple files consecutively, but again must always report back to the director in the end.
+Searcher: Can search and download videos and music files. Searcher can perform several consecutive searches, but musta always get back to the director once something worth showing is found. Searcher can also download multiple files consecutively, but again must always report back to the director in the end. If you have trouble finding videos, try broadening the search by using fewer keywords. Consider single-word search queries. Before downloading anything describe your findings to discuss what fits best.
 `;
 
 export function registerAgent(agent, send) {
@@ -190,11 +190,10 @@ export const searcherTools = [
 export const searcherFunctions = {
     searchVids: async (params) => {
         const { query } = params;
+        console.log(`--- Searching videos, query: ${query}`);
         const vids = await client.videos.search({
             query,
-            per_page: 3,
-            orientation: 'square',
-            size: 'small'
+            per_page: 8
         });
         // return vids;
         const videos = [];
@@ -260,6 +259,7 @@ export const searcherFunctions = {
     },
     searchMusic: async (params) => {
         const { query, tags } = params;
+        console.log(`--- Searching music, query: ${query}, tags: ${tags}`);
         const refresh = await readFile('./.env.refresh', 'utf8');
         const data = new URLSearchParams({
             client_id: process.env.FREESOUND_CLIENT_ID,
@@ -277,7 +277,7 @@ export const searcherFunctions = {
             {
                 params: {
                     query,
-                    page_size: 3,
+                    page_size: 8,
                     filter: `category:Music ${tags}`,
                     fields: 'id,url,type,download,avg_rating,name,tags,description,duration'
                 },

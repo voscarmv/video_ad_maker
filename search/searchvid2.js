@@ -32,7 +32,7 @@ const tools = [
 const functions = {
     searchVids: async (params) => {
         const { query } = params;
-        const vids = await client.videos.search({ query, per_page: 3, orientation: 'square', size: 'small' });
+        const vids = await client.videos.search({ query, per_page: 3 });
         // return vids;
         const videos = [];
         for (let i = 0; i < vids.videos.length; i++) {
@@ -99,7 +99,7 @@ messages.push({
 });
 
 (async () => {
-    const vids = await functions['searchVids']({ query: 'relaxing nature'});
+    const vids = await functions['searchVids']({ query: 'halloween'});
     console.log(vids);
 })();
 
