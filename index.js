@@ -13,6 +13,10 @@ const director = new Agent(
     directorTools,
     directorFunctions
 );
+const writer = new Agent(
+    'writer',
+    'You are the writer',
+)
 const searcher = new Agent(
     'searcher',
     'You are the searcher.',

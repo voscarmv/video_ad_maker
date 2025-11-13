@@ -17,12 +17,18 @@ export const agents = {};
 // const team = ['director', 'searcher'];
 
 export const roles = `
-The goal is to download 5 videos and 1 music file that match the theme of halloween.
+The goal is to produce a video promoting halloween.
+First have the writer create a script.
+Then, for each short phrase of the script, have the searcher look for one clip per phrase.
+The idea is that in the end the videos will be joined together in sequence as background for the phrases in the script.
+The sequence of videos should convey the message of the script.
+Also have the searcher find a proper background music for the final video.
 Evaluate search results before downloading, and if necessary run multiple different searches before downloading to refine the choice.
 
 These are the members of the team (agents)
 
 Director: Directs the whole operation. Communicates with team members to reach the goal. Terminates the process when all is done.
+Writer: Writes the script for the final video. The script must be short, composed by a small number of phrases that capture the subject of the final video. Estimate a total length of 1 minute max.
 Searcher: Can search and download videos and music files. Searcher can perform several consecutive searches, but musta always get back to the director once something worth showing is found. Searcher can also download multiple files consecutively, but again must always report back to the director in the end. If you have trouble finding videos, try broadening the search by using fewer keywords. Consider single-word search queries. Before downloading anything describe your findings to discuss what fits best.
 `;
 
@@ -128,7 +134,7 @@ export const searcherTools = [
                     },
                     tags: {
                         type: 'string',
-                        description: 'Single-word tags to look for, these can be moods, genres, etc. The format myst always be as follows: tag:your_tag_1 tag:your_tag_2 ... tag:your_tag_n Obviously replace your_tag_x with the actual tag values.'
+                        description: 'Single-word tags to look for. The format must always be as follows: tag:your_tag_1 tag:your_tag_2 ... tag:your_tag_n Obviously replace your_tag_x with the actual tag values.'
                     }
                 },
                 required: ['query', 'tags']
@@ -337,3 +343,11 @@ export const searcherFunctions = {
         )
     }
 };
+
+export const recorderTools = [];
+
+export const recorderFunctions = {};
+
+export const editorTools = [];
+
+export const editorFunctions = {};
