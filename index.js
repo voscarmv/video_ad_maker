@@ -9,13 +9,13 @@ import {
 
 const director = new Agent(
     'director',
-    'You are the editor.',
+    'You are the director.',
     directorTools,
     directorFunctions
 );
 const searcher = new Agent(
     'searcher',
-    'You are the writer.',
+    'You are the searcher.',
     searcherTools,
     searcherFunctions
 );

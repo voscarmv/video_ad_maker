@@ -12,9 +12,9 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_KEY,
 });
 
-const agents = {};
+export const agents = {};
 
-const team = ['director', 'searcher'];
+// const team = ['director', 'searcher'];
 
 export const roles = `
 The goal is to download 5 videos and 1 music file that match the theme of halloween.
@@ -44,12 +44,12 @@ export const tools = [
                     from: {
                         type: 'string',
                         description: 'Sender (you).',
-                        enum: team // Consider making tools=[] dynamic, calculate on run in gpt() or runAI(), to take advantage of agents={} here.
+                        enum: [] // Consider making tools=[] dynamic, calculate on run in gpt() or runAI(), to take advantage of agents={} here.
                     },
                     to: {
                         type: 'string',
                         description: 'Recipient (the other agent).',
-                        enum: team
+                        enum: []
                     },
                     message: {
                         type: 'string',
@@ -190,7 +190,7 @@ export const searcherTools = [
 export const searcherFunctions = {
     searchVids: async (params) => {
         const { query } = params;
-        console.log(`--- Searching videos, query: ${query}`);
+        console.log(`🔎🎥 Searching videos, query: ${query}`);
         const vids = await client.videos.search({
             query,
             per_page: 8
@@ -259,7 +259,7 @@ export const searcherFunctions = {
     },
     searchMusic: async (params) => {
         const { query, tags } = params;
-        console.log(`--- Searching music, query: ${query}, tags: ${tags}`);
+        console.log(`🔎🎼 Searching music, query: ${query}, tags: ${tags}`);
         const refresh = await readFile('./.env.refresh', 'utf8');
         const data = new URLSearchParams({
             client_id: process.env.FREESOUND_CLIENT_ID,
@@ -290,6 +290,7 @@ export const searcherFunctions = {
     },
     downloadVid: async (params) => {
         const { url, file_type, description } = params;
+        console.log(`⏬🎥 Downloading Video, url: ${url}, description: ${description}`);
         const filepath = `./video${Date.now()}.${file_type}`;
         const response = await axios.get(url, { responseType: "stream" });
         const writer = fs.createWriteStream(filepath);
@@ -304,6 +305,7 @@ export const searcherFunctions = {
     },
     downloadMusic: async (params) => {
         const { url, file_type, description } = params;
+        console.log(`⏬🎼 Downloading Music, url: ${url}, description: ${description}`);
         const filepath = `./music${Date.now()}.${file_type}`;
         const refresh = await readFile('./.env.refresh', 'utf8');
         const data = new URLSearchParams({

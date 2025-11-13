@@ -1,6 +1,6 @@
 import { registerAgent, roles } from './tools.js';
 import { runAI } from './gpt.js';
-import { tools, functions, getTermination } from './tools.js';
+import { tools, agents, functions, getTermination } from './tools.js';
 
 export class Agent {
     constructor(name, prompt, agentTools = [], agentFunctions = {}) {
@@ -35,6 +35,7 @@ export class Agent {
             this.queue.length = 0;
             const reply = await runAI(
                 this.name,
+                agents,
                 this.messages,
                 this.tools,
                 this.functions

@@ -4,7 +4,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_KEY,
 });
 
-export async function gpt(messages, tools) {
+async function gpt(messages, tools) {
   const completion = await openai.chat.completions.create({
     messages,
     tools,
@@ -17,7 +17,7 @@ export async function gpt(messages, tools) {
   };
 }
 
-export async function callTool(tool_call, additionalArgs, functions) {
+async function callTool(tool_call, additionalArgs, functions) {
   const tool_call_id = tool_call?.id;
   const functionName = tool_call?.function?.name;
   const functionArgs = JSON.parse(tool_call?.function?.arguments || '{}');
@@ -30,7 +30,13 @@ export async function callTool(tool_call, additionalArgs, functions) {
   };
 }
 
-export async function runAI(name, messages, tools, functions, additionalArgs = {}) {
+export async function runAI(name, agents, messages, tools, functions, additionalArgs = {}) {
+  const team = [];
+  for (const agent in agents) {
+    team.push(agent);
+  }
+  tools[0].function.parameters.properties.from.enum = team;
+  tools[0].function.parameters.properties.to.enum = team;
   let reply = await gpt(messages, tools);
   const message = {
     role: 'assistant',
@@ -49,7 +55,7 @@ export async function runAI(name, messages, tools, functions, additionalArgs = {
       });
       if(reply.tool_calls[i].function.name === 'sendMessage') messageSent = true;
     }
-    if(!messageSent) return runAI(name, messages, tools, functions, additionalArgs);
+    if(!messageSent) return runAI(name, agents, messages, tools, functions, additionalArgs);
   }
   return messages;
 }
