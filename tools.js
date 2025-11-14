@@ -423,12 +423,12 @@ export const recorderFunctions = {
             currentTime = endTime;
         }
         const concats = files.join(' ');
-        const outputfile = `./voice_final${Date.now()}.wav`;
-        const {stderr: voiceerr} = await execAsync(`sox ${concats} ${outputfile}`);
+        const voice_final = `./voice_final${Date.now()}.wav`;
+        const {stderr: voiceerr} = await execAsync(`sox ${concats} ${voice_final}`);
         if(voiceerr) return "Could not create voice recording";
         const srt_path = `./srt${Date.now()}.srt`;
         await writeFile(srt_path, srt, 'utf8');
-        return JSON.stringify({ voice_final: srt_path });
+        return JSON.stringify({ voice_final, srt_path });
     }
 
 };
