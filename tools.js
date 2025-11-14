@@ -9,7 +9,6 @@ import { exec } from 'node:child_process';
 import { finished } from "stream/promises";
 import { readFile, writeFile } from 'node:fs/promises';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import { stderr } from 'node:process';
 
 const credentials = {
     type: process.env.type,
@@ -29,6 +28,7 @@ const client = createClient(process.env.PEXELS_KEY);
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_KEY,
 });
+const execAsync = util.promisify(exec);
 
 export const agents = {};
 
@@ -43,13 +43,17 @@ The idea is that in the end the videos will be joined together in sequence as ba
 The sequence of videos should convey the message of the script.
 Also have the searcher find a proper background music for the final video.
 Evaluate search results before downloading, and if necessary run multiple different searches before downloading to refine the choice.
+Everyone always share the file paths and results to the director.
+Everyone should always send just one message at a time and wait for a response, and everyone should always respond when messaged to.
+IMPORTANT: If you are missing any piece of information to do your task always ask the director, so the director can collect the needed information from others or share it if they already have it.
 
 These are the members of the team (agents)
 
-Director: Directs the whole operation. Communicates with team members to reach the goal. Request and pass on the information that each team member needs to complete their tasks. Terminates the process when all is done.
-Writer: Writes the script for the final video. The script must be short, composed by a small number of phrases that capture the subject of the final video. Estimate a total length of 1 minute max.
-Recorder: Creates the voice recording and SRT for the final cut.
+Director: Directs the whole operation. Communicates with team members to reach the goal. Request and pass on the information that each team member needs to complete their tasks. Terminates the process when all is done. Don't assume the others have the information, relay the info if needed.
+Writer: Writes the script for the final video. The script must be short, composed by 3 phrases that capture the subject of the final video.
+Recorder: Creates the voice recording and SRT for the final cut. Share precise durations to the millisecond mark.
 Searcher: Can search and download videos and music files. Searcher can perform several consecutive searches, but musta always get back to the director once something worth showing is found. Searcher can also download multiple files consecutively, but again must always report back to the director in the end. If you have trouble finding videos, try broadening the search by using fewer keywords. Consider single-word search queries. Before downloading anything describe your findings to discuss what fits best.
+Editor: Generates the final cut. Requires the paths to all the videos, to the voice recording, to the srt and the durations of every phrase in order. IMPORTANT: if you are missing any information be sure to ask the director before you begin your task.
 `;
 
 export function registerAgent(agent, send) {
@@ -386,10 +390,11 @@ export const recorderTools = [
 
 export const recorderFunctions = {
     recordVoice: async (params) => {
+        console.log('🗣️🎙️ Recording voice')
         const { phrases } = params;
-        const execAsync = util.promisify(exec);
         const chunks = phrases.split('|');
         const files = [];
+        const durations = [];
         let srt = '';
         let currentTime = 0;
         function timecode(seconds) {
@@ -397,12 +402,9 @@ export const recorderFunctions = {
             const mins = Math.floor((seconds % 3600) / 60);
             const secs = Math.floor(seconds % 60);
             const millis = Math.round((seconds - Math.floor(seconds)) * 1000);
-
             const pad = (n, size = 2) => String(n).padStart(size, '0');
-
             return `${pad(hrs)}:${pad(mins)}:${pad(secs)},${pad(millis, 3)}`;
         }
-
         for (let i = 0; i < chunks.length; i++) {
             const filepath = `./voice${Date.now()}.wav`;
             const request = {
@@ -418,21 +420,209 @@ export const recorderFunctions = {
             const dur = Number(duration);
             if (error) return `Could not create voice recording`;
             const endTime = currentTime + dur;
-            console.log(`Text ${chunks[i]}, duration ${dur}, curr: ${currentTime}, end: ${endTime}`)
-            srt = `${srt}${i + 1}\n${timecode(currentTime)} - ${timecode(endTime)}\n${chunks[i]}\n\n`;
+            // console.log(`Text ${chunks[i]}, duration ${dur}, curr: ${currentTime}, end: ${endTime}`)
+            srt = `${srt}${i + 1}\n${timecode(currentTime)} --> ${timecode(endTime)}\n${chunks[i]}\n\n`;
+            durations.push(dur);
             currentTime = endTime;
         }
         const concats = files.join(' ');
         const voice_final = `./voice_final${Date.now()}.wav`;
-        const {stderr: voiceerr} = await execAsync(`sox ${concats} ${voice_final}`);
-        if(voiceerr) return "Could not create voice recording";
+        const { stderr: voiceerr } = await execAsync(`sox ${concats} ${voice_final}`);
+        if (voiceerr) return "Could not create voice recording";
         const srt_path = `./srt${Date.now()}.srt`;
         await writeFile(srt_path, srt, 'utf8');
-        return JSON.stringify({ voice_final, srt_path });
+        return JSON.stringify({ voice_final, srt_path, durations });
     }
 
 };
 
-export const editorTools = [];
+export const editorTools = [
+    {
+        type: 'function',
+        function: {
+            name: 'createVideo',
+            description: 'Create the final clip with background music, voice and videos',
+            parameters: {
+                type: 'object',
+                properties: {
+                    video_paths: {
+                        type: 'string',
+                        description: 'The ordered paths to the videos separated by |',
+                    },
+                    durations: {
+                        type: 'string',
+                        description: 'The ordered durations in seconds, just float numbers, of each phrase separated by |'
+                    },
+                    voice_path: {
+                        type: 'string',
+                        description: 'Path of the final voice recording',
+                    },
+                    music_path: {
+                        type: 'string',
+                        description: 'Path to the background music',
+                    },
+                    srt_path: {
+                        type: 'string',
+                        description: 'Path to the SRT file'
+                    }
+                },
+                required: ['video_paths', 'durations', 'voice_path', 'music_path', 'srt_path']
+            }
+        }
+    }
+];
 
-export const editorFunctions = {};
+export const editorFunctions = {
+    createVideo: async (params) => {
+        console.log('🎥✂️ Creating final cut');
+        const { video_paths, durations, voice_path, music_path, srt_path } = params;
+        const width = 1920;
+        const height = 1080;
+        console.log(`params: ${params}, w,h: ${width},${height}`)
+        // Parse video list
+        const videoPaths = video_paths
+            .split("|")
+            .map(s => s.trim())
+            .filter(Boolean);
+
+        // Parse durations (decimals allowed)
+        const durs = durations
+            .split("|")
+            .map(s => Number(s.trim()))
+            .filter(n => !isNaN(n));
+
+        if (durs.length !== videoPaths.length) {
+            throw new Error(
+                `Number of durations (${durs.length}) does not match number of videos (${videoPaths.length}).`
+            );
+        }
+
+        // All video inputs
+        const videoInputArgs = videoPaths
+            .map(v => `-i "${v}"`)
+            .join(" ");
+
+        // Add voice + music
+        const wavInput = `-i "${voice_path}"`;
+        const musicInput = `-i "${music_path}"`;
+
+        // Build trim + scale + crop filters
+        const videoFilters = videoPaths.map((_, i) => {
+            const dur = durs[i];
+            return (
+                `[${i}:v]trim=start=0:end=${dur},setpts=PTS-STARTPTS,` +
+                `scale=${width}:${height}:force_original_aspect_ratio=increase,` +
+                `crop=${width}:${height}:(iw-${width})/2:(ih-${height})/2[v${i}];`
+            );
+        }).join("");
+
+        // Concat filter
+        const concatLabels = videoPaths.map((_, i) => `[v${i}]`).join("");
+        const concatFilter = `${concatLabels}concat=n=${videoPaths.length}:v=1:a=0[vid];`;
+
+        // Subtitles MUST be applied inside the same filtergraph
+        const subtitleFilter =
+            `[vid]subtitles=${JSON.stringify(srt_path)}[subtitled];`;
+
+        // Mix voice + music
+        const audioMixFilter =
+            `[${videoPaths.length}:a]volume=1.0[bg];` +
+            `[${videoPaths.length + 1}:a]volume=0.4[music];` +
+            `[bg][music]amix=inputs=2:normalize=1[audio]`;
+
+        // FINAL filter_complex
+        const filterComplex =
+            `"${videoFilters}${concatFilter}${subtitleFilter}${audioMixFilter}"`;
+
+        const finalOutput = "output.mp4";
+
+        // FINAL ffmpeg command
+        const cmd =
+            `ffmpeg ${videoInputArgs} ${wavInput} ${musicInput} ` +
+            `-filter_complex ${filterComplex} ` +
+            `-map "[subtitled]" -map "[audio]" ` +
+            `-c:v libx264 -crf 18 -preset medium ` +
+            `-c:a aac -b:a 192k -shortest "${finalOutput}"`;
+
+        console.log(cmd);
+        const { stdout, stderr } = await execAsync(cmd);
+
+        if (stderr) {
+            console.error(stderr);
+            return "Could not generate final clip";
+        }
+
+        return "Final clip generated.";
+    }
+};
+
+
+// export const editorFunctions = {
+//     createVideo: async (params) => {
+//         console.log('🎥✂️ Creating final cut');
+//         const { video_paths, durations, voice_path, music_path, srt_path } = params;
+//         const width = 1920;
+//         const height = 1080;
+//         // Parse video list
+//         const videoPaths = video_paths
+//             .split("|")
+//             .map(s => s.trim())
+
+//         // Parse durations list (decimals OK)
+//         const durs = durations
+//             .split("|")
+//             .map(s => s.trim())
+//             .map(Number);
+
+//         if (durs.length !== videoPaths.length) {
+//             throw new Error(
+//                 `Number of durations (${durs.length}) does not match number of videos (${videoPaths.length}).`
+//             );
+//         }
+
+//         // Build input args for videos
+//         const videoInputArgs = videoPaths
+//             .map(v => `-i "${v}"`)
+//             .join(" ");
+
+//         // Background wav + music inputs
+//         const wavInput = `-i "${voice_path}"`;
+//         const musicInput = `-i "${music_path}"`;
+
+//         // Build individual video trim+scale+crop filters
+//         const videoFilters = videoPaths.map((_, i) => {
+//             const dur = durs[i];
+//             return `[${i}:v]trim=start=0:end=${dur},setpts=PTS-STARTPTS,` +
+//                 `scale=${width}:${height}:force_original_aspect_ratio=increase,` +
+//                 `crop=${width}:${height}:(iw-${width})/2:(ih-${height})/2[v${i}];`;
+//         }).join("");
+
+//         // Concatenate all video clips
+//         const concatLabels = videoPaths.map((_, i) => `[v${i}]`).join("");
+//         const concatFilter =
+//             `${concatLabels}concat=n=${videoPaths.length}:v=1:a=0[vid];`;
+
+//         // WAV + MP3 mixing
+//         const audioMixFilter =
+//             `[${videoPaths.length}:a]volume=1.0[bg];` +
+//             `[${videoPaths.length + 1}:a]volume=0.4[music];` +
+//             `[bg][music]amix=inputs=2:normalize=1[audio]`;
+
+//         // Full filter_complex
+//         const filterComplex = `"${videoFilters}${concatFilter}${audioMixFilter}"`;
+
+//         // Build final FFmpeg command
+//         const final = 'output.mp4';
+//         const cmd =
+//             `ffmpeg ${videoInputArgs} ${wavInput} ${musicInput} ` +
+//             `-filter_complex ${filterComplex} ` +
+//             `-vf "subtitles=${srt_path}" ` +
+//             `-map "[vid]" -map "[audio]" ` +
+//             `-c:v libx264 -crf 18 -preset medium ` +
+//             `-c:a aac -b:a 192k -shortest "${final}"`;
+
+//         const { stdout: output, stderr: error } = await execAsync(cmd);
+//         if (error) return "Could not generate final clip";
+//         return "Final clip generated."
+//     }
+// };

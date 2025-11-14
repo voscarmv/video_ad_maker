@@ -1,14 +1,20 @@
 import OpenAI from "openai";
 
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_KEY,
+// });
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_KEY,
+    baseURL: 'https://api.deepseek.com',
+    apiKey: process.env.DEEPSEEK_KEY
 });
+
 
 async function gpt(messages, tools) {
   const completion = await openai.chat.completions.create({
     messages,
     tools,
-    model: 'gpt-4.1-mini',
+    model: 'deepseek-chat',
   });
   const message = completion?.choices?.[0]?.message;
   return {

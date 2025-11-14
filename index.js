@@ -8,7 +8,8 @@ import {
     recorderTools,
     recorderFunctions,
     editorTools,
-    editorFunctions
+    editorFunctions,
+    agents
 } from './tools.js';
 
 const director = new Agent(
@@ -33,5 +34,12 @@ const searcher = new Agent(
     searcherTools,
     searcherFunctions
 );
+const editor = new Agent(
+    'editor',
+    'You are the editor.',
+    editorTools,
+    editorFunctions
+);
 
+console.log(agents);
 director.receive('system', 'Begin the process now.');
