@@ -4,9 +4,27 @@ import { createClient } from 'pexels';
 import axios from 'axios';
 import sharp from 'sharp';
 import fs from 'fs';
+import util from 'util';
+import { exec } from 'node:child_process';
 import { finished } from "stream/promises";
 import { readFile, writeFile } from 'node:fs/promises';
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import { stderr } from 'node:process';
 
+const credentials = {
+    type: process.env.type,
+    project_id: process.env.project_id,
+    private_key_id: process.env.private_key_id,
+    private_key: process.env.private_key,
+    client_email: process.env.client_email,
+    client_id: process.env.client_id,
+    auth_uri: process.env.auth_uri,
+    token_uri: process.env.token_uri,
+    auth_provider_x509_cert_url: process.env.auth_provider_x509_cert_url,
+    client_x509_cert_url: process.env.client_x509_cert_url,
+    universe_domain: process.env.universe_domain,
+};
+const ttsclient = new TextToSpeechClient({ credentials });
 const client = createClient(process.env.PEXELS_KEY);
 const openai = new OpenAI({
     apiKey: process.env.OPENAI_KEY,
@@ -19,6 +37,7 @@ export const agents = {};
 export const roles = `
 The goal is to produce a video promoting halloween.
 First have the writer create a script.
+Then, pass the script to the voice recorder, who will produce a file with the speech, and another one with the SRT subtitles for the final cut.
 Then, for each short phrase of the script, have the searcher look for one clip per phrase.
 The idea is that in the end the videos will be joined together in sequence as background for the phrases in the script.
 The sequence of videos should convey the message of the script.
@@ -27,8 +46,9 @@ Evaluate search results before downloading, and if necessary run multiple differ
 
 These are the members of the team (agents)
 
-Director: Directs the whole operation. Communicates with team members to reach the goal. Terminates the process when all is done.
+Director: Directs the whole operation. Communicates with team members to reach the goal. Request and pass on the information that each team member needs to complete their tasks. Terminates the process when all is done.
 Writer: Writes the script for the final video. The script must be short, composed by a small number of phrases that capture the subject of the final video. Estimate a total length of 1 minute max.
+Recorder: Creates the voice recording and SRT for the final cut.
 Searcher: Can search and download videos and music files. Searcher can perform several consecutive searches, but musta always get back to the director once something worth showing is found. Searcher can also download multiple files consecutively, but again must always report back to the director in the end. If you have trouble finding videos, try broadening the search by using fewer keywords. Consider single-word search queries. Before downloading anything describe your findings to discuss what fits best.
 `;
 
@@ -344,9 +364,74 @@ export const searcherFunctions = {
     }
 };
 
-export const recorderTools = [];
+export const recorderTools = [
+    {
+        type: 'function',
+        function: {
+            name: 'recordVoice',
+            description: 'Record the voice for the final clip and create the SRT file for the video subtitles',
+            parameters: {
+                type: 'object',
+                properties: {
+                    phrases: {
+                        type: 'string',
+                        description: 'The ordered phrases from the script separated by |',
+                    },
+                },
+                required: ['phrases']
+            }
+        }
+    }
+];
 
-export const recorderFunctions = {};
+export const recorderFunctions = {
+    recordVoice: async (params) => {
+        const { phrases } = params;
+        const execAsync = util.promisify(exec);
+        const chunks = phrases.split('|');
+        const files = [];
+        let srt = '';
+        let currentTime = 0;
+        function timecode(seconds) {
+            const hrs = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            const millis = Math.round((seconds - Math.floor(seconds)) * 1000);
+
+            const pad = (n, size = 2) => String(n).padStart(size, '0');
+
+            return `${pad(hrs)}:${pad(mins)}:${pad(secs)},${pad(millis, 3)}`;
+        }
+
+        for (let i = 0; i < chunks.length; i++) {
+            const filepath = `./voice${Date.now()}.wav`;
+            const request = {
+                input: { text: chunks[i] },
+                voice: { languageCode: 'en-US', ssmlGender: 'NEUTRAL' },
+                audioConfig: { audioEncoding: 'LINEAR16' },
+            };
+            const [response] = await ttsclient.synthesizeSpeech(request);
+            const writeFile = util.promisify(fs.writeFile);
+            await writeFile(filepath, response.audioContent, 'binary');
+            files.push(filepath);
+            const { stdout: duration, stderr: error } = await execAsync(`soxi -D ${filepath}`);
+            const dur = Number(duration);
+            if (error) return `Could not create voice recording`;
+            const endTime = currentTime + dur;
+            console.log(`Text ${chunks[i]}, duration ${dur}, curr: ${currentTime}, end: ${endTime}`)
+            srt = `${srt}${i + 1}\n${timecode(currentTime)} - ${timecode(endTime)}\n${chunks[i]}\n\n`;
+            currentTime = endTime;
+        }
+        const concats = files.join(' ');
+        const outputfile = `./voice_final${Date.now()}.wav`;
+        const {stderr: voiceerr} = await execAsync(`sox ${concats} ${outputfile}`);
+        if(voiceerr) return "Could not create voice recording";
+        const srt_path = `./srt${Date.now()}.srt`;
+        await writeFile(srt_path, srt, 'utf8');
+        return JSON.stringify({ voice_final: srt_path });
+    }
+
+};
 
 export const editorTools = [];
 

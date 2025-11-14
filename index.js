@@ -4,7 +4,11 @@ import {
     directorTools,
     directorFunctions,
     searcherTools,
-    searcherFunctions
+    searcherFunctions,
+    recorderTools,
+    recorderFunctions,
+    editorTools,
+    editorFunctions
 } from './tools.js';
 
 const director = new Agent(
@@ -16,6 +20,12 @@ const director = new Agent(
 const writer = new Agent(
     'writer',
     'You are the writer',
+)
+const recorder = new Agent(
+    'recorder',
+    'You are the recorder',
+    recorderTools,
+    recorderFunctions
 )
 const searcher = new Agent(
     'searcher',
